@@ -1,0 +1,34 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.3.11'
+    id 'com.github.johnrengelman.shadow' version '2.0.4'
+}
+
+group 'cn.zenliu'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    compileOnly "ch.qos.logback:logback-classic:$logback_version"
+    compileOnly "io.ktor:ktor-server-netty:$ktor_version"
+    compileOnly "io.ktor:ktor-server-core:$ktor_version"
+    compileOnly "io.ktor:ktor-server-host-common:$ktor_version"
+    compileOnly "io.ktor:ktor-metrics:$ktor_version"
+    compileOnly "io.ktor:ktor-websockets:$ktor_version"
+    compileOnly "io.ktor:ktor-jackson:$ktor_version"
+    compileOnly "joda-time:joda-time:2.10.1"
+    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinx_coroutines_version"
+
+    testImplementation "io.ktor:ktor-server-tests:$ktor_version"
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
