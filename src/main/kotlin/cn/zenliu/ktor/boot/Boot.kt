@@ -6,6 +6,9 @@
 package cn.zenliu.ktor.boot
 
 
+import cn.zenliu.ktor.boot.Context.BeanManager.executeKFunction
+import cn.zenliu.ktor.boot.Context.BeanManager.instanceOf
+import cn.zenliu.ktor.boot.Context.ClassManager.getRouteFunctions
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.*
@@ -34,6 +37,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.util.cio.toByteArray
 import io.ktor.util.pipeline.PipelineContext
+import jdk.nashorn.internal.objects.NativeArray.forEach
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -54,10 +58,7 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.KParameter.Kind.EXTENSION_RECEIVER
 import kotlin.reflect.KParameter.Kind.INSTANCE
 import kotlin.reflect.KType
-import kotlin.reflect.full.callSuspend
-import kotlin.reflect.full.declaredFunctions
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.isSubclassOf
+import kotlin.reflect.full.*
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.kotlinFunction
 import kotlin.streams.toList
@@ -137,6 +138,20 @@ inline val KClass<*>.declaredFunctionsSafe
         this.java.methods.map { it.kotlinFunction }.filterNotNull()
     }
 
+@Suppress("NOTHING_TO_INLINE")
+inline val KClass<*>.functionsSafe
+    get() = try {
+        this.functions
+    } catch (e: UnsupportedOperationException) {
+        this.java.methods.map { it.kotlinFunction }.filterNotNull()
+    }
+@Suppress("NOTHING_TO_INLINE")
+inline val KClass<*>.annotationsSafe
+    get() = try {
+        this.annotations
+    } catch (e: UnsupportedOperationException) {
+        this.java.annotations.filterNotNull()
+    }
 //</editor-fold>
 //<editor-fold desc="Jackson">
 object JsonMapper {
@@ -187,7 +202,7 @@ object JsonMapper {
             }
             registerSerializer<Instant?> { value, gen, _ ->
                 gen?.writeRawValue(value?.let {
-                    "\"${value.toString()}\""
+                    "\"$value\""
                 }
                     ?: "null")
             }
@@ -206,7 +221,7 @@ object JsonMapper {
             }
             registerSerializer<DateTime?> { value, gen, _ ->
                 gen?.writeRawValue(value?.let {
-                    "\"${value.toString()}\""
+                    "\"$value\""
                 }
                     ?: "null")
             }
@@ -292,6 +307,9 @@ data class CanNotCreateInstanceByConstructor(val fn: KFunction<*>, val throwable
 
 data class CanNotCreateInstanceClass(val fn: KClass<*>, val throwable: Throwable? = null) :
     Throwable("can not instance ${fn.java.typeName}", throwable)
+
+data class NotValidRawRouteFunction(val fn: KFunction<*>, val clazz: KClass<*>, val throwable: Throwable? = null) :
+    Throwable("${clazz.qualifiedName}::${fn.name} is not valid RawRouteFunction", throwable)
 //</editor-fold>
 
 //<editor-fold desc="StatusResponse">
@@ -372,7 +390,7 @@ annotation class RequestMapping(val path: String, val method: HTTPMETHOD = HTTPM
  */
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
-annotation class RawRoute()
+annotation class RawRoute
 
 /*
 @Target(AnnotationTarget.FUNCTION)
@@ -451,7 +469,7 @@ object Context : CoroutineScope {
         application.log.debug("find bean classes: ${ClassManager.clazzRegistry}")
         configuration(application)
         application.log.debug("configure application: ${ClassManager.getConfigurations()}")
-        RouterManager.instance(application, ClassManager.getEndpoints())
+        RouterManager.instance(application, ClassManager.getControllers(),ClassManager.getRouteFunctions())
     }
 
     private fun configuration(app: Application) =
@@ -462,7 +480,7 @@ object Context : CoroutineScope {
                 (instance as IBootConfiguration).applicationConfiguration(app)
             } else {
                 container.configurationFunctions().forEach {
-                    BeanManager.excuteFunction(instance, it, app)
+                    BeanManager.executeKFunction(instance, it, app)
                 }
             }
         }
@@ -473,9 +491,10 @@ object Context : CoroutineScope {
         val path: String = "",
         val clazz: KClass<*>
     ) {
-        val annotations: List<Annotation> = clazz.java.annotations.toList()
+        val annotations: List<Annotation> = clazz.annotationsSafe.toList()
         val isSingleton: Boolean by lazy { clazz.findAnnotationSafe<Singleton>()?.let { true } ?: false }
-        val isEndpoint: Boolean  by lazy { clazz.findAnnotationSafe<Controller>()?.let { true } ?: false }
+        val isController: Boolean  by lazy { clazz.findAnnotationSafe<Controller>()?.let { true } ?: false }
+        val routeFunctions by lazy { clazz.functionsSafe.filter { it.findAnnotation<RawRoute>()!=null } }
         val alias: String? by lazy { (annotations.find { it is Name } as? Name)?.name }
         val isConfigurationClass: Boolean by lazy {
             clazz.findAnnotationSafe<Configuration>() != null && clazz.isSubclassOf(IBootConfiguration::class)
@@ -568,13 +587,13 @@ object Context : CoroutineScope {
                 it.clazz.findAnnotationSafe<Order>()?.value ?: 0
             }
 
-        fun getEndpoints() =
+        fun getControllers() =
             clazzRegistry
-                .filter { it.value.isEndpoint }
+                .filter { it.value.isController }
                 .map { it.value.clazz to BeanManager.instanceOf(it.value) }.sortedBy {
                     it.first.findAnnotationSafe<Order>()?.value ?: 0
                 }
-
+        fun getRouteFunctions()= clazzRegistry.filter { it.value.routeFunctions.isNotEmpty() }.map { it.value.routeFunctions to instanceOf(it.value) }
         private fun getFileClasses(url: URL, pkg: String, root: String): Set<BeanContainer> =
             File(url.file).listFiles().map {
                 when {
@@ -683,7 +702,7 @@ object Context : CoroutineScope {
                         ).apply { beanRegistry[bname] = this }
         }
 
-        fun excuteFunction(target: Any, fn: KFunction<*>, vararg params: Any) = fn.parameters.map { param ->
+        fun executeKFunction(target: Any, fn: KFunction<*>, vararg params: Any) = fn.parameters.map { param ->
             when {
                 param.kind == INSTANCE || param.kind == EXTENSION_RECEIVER -> target
                 else -> params.find { param.type.isClass(it::class) }
@@ -698,7 +717,7 @@ object Context : CoroutineScope {
             fn.call(*it.toTypedArray())
         }
 
-        suspend fun asyncExcuteFunction(target: Any, fn: KFunction<*>, vararg params: Any) =
+        suspend fun asyncExcuteKFunction(target: Any, fn: KFunction<*>, vararg params: Any) =
             fn.parameters.map { param ->
                 when {
                     param.kind == INSTANCE || param.kind == EXTENSION_RECEIVER -> target
@@ -716,24 +735,49 @@ object Context : CoroutineScope {
     }
 
 
-    class RouterManager(private val application: Application, val clazz: Collection<Pair<KClass<*>, Any>>) :
-        CoroutineScope {
+    class RouterManager(
+        private val application: Application,
+        val clazz: Collection<Pair<KClass<*>, Any>>,
+        val routeFun: Collection<Pair<Collection<KFunction<*>>, Any>>
+    ) : CoroutineScope {
         override val coroutineContext: CoroutineContext = application.coroutineContext
         private val log by lazy { application.log }
 
         init {
             application.routing {
+                routeFun.forEach { (fns,instance)->
+                   fns .forEach {fn ->
+                    when {
+                        fn.parameters.size != 2 -> throw NotValidRawRouteFunction(fn, instance::class)
+                        (fn.parameters.first().kind == EXTENSION_RECEIVER || fn.parameters.first().kind == INSTANCE) && fn.parameters[1].type.isClass(
+                            Routing::class                        )
+                        -> executeKFunction(instance, fn, this@routing)
+                        else -> throw NotValidRawRouteFunction(fn, instance::class)
+                    }
+                }
+                }
                 clazz.forEach { (kclass, instance) ->
                     application.log.debug("regist endpoint: ${kclass.qualifiedName}")
-                    kclass.declaredFunctions.filter { it.findAnnotation<RequestMapping>()!=null }.forEach { fn ->
-                        annotationEndPointProcessor(
-                            kclass.findAnnotationSafe<RequestMapping>()?.path,
-                            fn,
-                            this,
-                            instance
-                        )
+                    kclass.declaredFunctions.apply {
+                        filter { it.findAnnotation<RawRoute>() != null }.forEach { fn ->
+                            when {
+                                fn.parameters.size != 2 -> throw NotValidRawRouteFunction(fn, instance::class)
+                                (fn.parameters.first().kind == EXTENSION_RECEIVER || fn.parameters.first().kind == INSTANCE) && fn.parameters[1].type.isClass(
+                                    Routing::class
+                                )
+                                -> executeKFunction(instance, fn, this@routing)
+                                else -> throw NotValidRawRouteFunction(fn, instance::class)
+                            }
+                        }
+                        filter { it.findAnnotation<RequestMapping>() != null }.forEach { fn ->
+                            annotationEndPointProcessor(
+                                kclass.findAnnotationSafe<RequestMapping>()?.path,
+                                fn,
+                                this@routing,
+                                instance
+                            )
+                        }
                     }
-
                 }
 
             }
@@ -947,10 +991,14 @@ object Context : CoroutineScope {
             )
 
             private var instanceClass: RouterManager? = null
-            private val emptyList = mutableListOf<Pair<KClass<*>, Any>>()
-            fun instance(application: Application? = null, clazz: Collection<Pair<KClass<*>, Any>> = emptyList) = when {
+            private val emptyClassList = mutableListOf<Pair<KClass<*>, Any>>()
+            private val emptyFunList = mutableListOf<Pair<Collection<KFunction<*>>, Any>>()
+            fun instance(
+                application: Application? = null,
+                clazz: Collection<Pair<KClass<*>, Any>> = emptyClassList,
+                fn:Collection<Pair<Collection<KFunction<*>>, Any>> =emptyFunList) = when {
                 application == null && instanceClass == null -> null
-                instanceClass == null && application != null -> RouterManager(application, clazz)
+                instanceClass == null && application != null -> RouterManager(application, clazz,fn)
                 else -> instanceClass
             }
         }
