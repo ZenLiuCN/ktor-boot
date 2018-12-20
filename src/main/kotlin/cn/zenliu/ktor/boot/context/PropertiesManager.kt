@@ -22,7 +22,8 @@ object PropertiesManager {
     private val hostSslKeyAlias = "ktor.security.ssl.keyAlias"
     private val hostSslKeyStorePassword = "ktor.security.ssl.keyStorePassword"
     private val hostSslPrivateKeyPassword = "ktor.security.ssl.privateKeyPassword"
-
+    
+    private var env:ApplicationEngineEnvironment?=null
     private val properties = mutableMapOf<String, KClass<*>>()
     private var conf: ApplicationConfig? = null
     val config: ApplicationConfig
@@ -32,16 +33,15 @@ object PropertiesManager {
             conf!!
         }
     val configuration by lazy { ConfigFactory.load() }
-    private var app: Application? = null
     val application: Application
-        get() = if (app == null) {
+        get() = if (env == null) {
             throw Throwable("application not init")
         } else {
-            app!!
+            env.application!!
         }
 
     fun setConfiguration(args: Array<String>) = commandLineEnvironment(args).apply {
-        this@PropertiesManager.app = this.application
+        this@PropertiesManager.env = this
         this@PropertiesManager.conf = this.config
     }
     fun port(default:Int=80)=config.propertyOrNull(hostPortPath)?.getString()?.toInt()?:default
