@@ -3,7 +3,7 @@ package cn.zenliu.ktor.boot.context
 import com.typesafe.config.ConfigFactory
 import io.ktor.application.Application
 import io.ktor.config.ApplicationConfig
-import io.ktor.server.engine.commandLineEnvironment
+import io.ktor.server.engine.*
 import io.ktor.util.KtorExperimentalAPI
 import kotlinx.io.charsets.Charset
 import java.math.BigDecimal
