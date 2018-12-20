@@ -1,7 +1,8 @@
 package cn.zenliu.ktor.boot.context
 
+import cn.zenliu.ktor.boot.annotations.context.Ignore
 import cn.zenliu.ktor.boot.annotations.request.Body
-import cn.zenliu.ktor.boot.annotations.request.Parameter
+import cn.zenliu.ktor.boot.annotations.request.QueryParam
 import cn.zenliu.ktor.boot.annotations.request.PathVariable
 import cn.zenliu.ktor.boot.annotations.routing.RawRoute
 import cn.zenliu.ktor.boot.annotations.routing.RequestMapping
@@ -30,6 +31,7 @@ import io.ktor.routing.routing
 import io.ktor.util.KtorExperimentalAPI
 import io.ktor.util.cio.toByteArray
 import io.ktor.util.pipeline.PipelineContext
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import reactor.core.publisher.Flux
@@ -46,7 +48,16 @@ import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.javaType
 
-
+/**
+ * sigleton class for all route handler
+ * @property application Application
+ * @property clazz Collection<Pair<KClass<*>, Any>> Controller Classes  @see [Controller]
+ * @property routeFun Collection<Pair<Collection<KFunction<*>>, Any>> RawRoute Functions @see[RawRoute]
+ * @property coroutineContext CoroutineContext @see [BootCoroutineContext]
+ * @property log Logger
+ * @constructor
+ */
+@Ignore
 class RouteManager(
     private val application: Application,
     val clazz: Collection<Pair<KClass<*>, Any>>,
@@ -152,7 +163,7 @@ class RouteManager(
                                             }
                                         }
                                     }
-                                } ?: p.findAnnotation<Parameter>()?.let {
+                                } ?: p.findAnnotation<QueryParam>()?.let {
                                     call.parameters[if (it.name.isNotBlank()) it.name else p.name!!]?.let {
                                         parseParameter(
                                             p.type,

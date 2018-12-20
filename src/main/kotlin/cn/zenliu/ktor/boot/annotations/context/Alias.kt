@@ -6,5 +6,5 @@ package cn.zenliu.ktor.boot.annotations.context
  * @constructor
  */
 @Target(AnnotationTarget.CLASS)
-annotation class Name(val name: String)
+annotation class Alias(val name: String)
 

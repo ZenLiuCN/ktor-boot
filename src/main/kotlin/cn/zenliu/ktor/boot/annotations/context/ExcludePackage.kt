@@ -1,10 +1,9 @@
 package cn.zenliu.ktor.boot.annotations.context
 
-
 /**
- * define extra package to scan
+ * define some package should not be scan use on Application class
  * @property packages Array<String>
  * @constructor
  */
 @Target(AnnotationTarget.CLASS)
-annotation class ScanPackage(val packages: Array<String>)
+annotation class ExcludePackage(val packages: Array<String>)

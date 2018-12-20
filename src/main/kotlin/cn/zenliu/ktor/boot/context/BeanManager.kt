@@ -1,6 +1,7 @@
 package cn.zenliu.ktor.boot.context
 
 import cn.zenliu.ktor.boot.annotations.context.AutoWire
+import cn.zenliu.ktor.boot.annotations.context.Ignore
 import cn.zenliu.ktor.boot.exceptions.CanNotCreateInstance
 import cn.zenliu.ktor.boot.exceptions.CanNotCreateInstanceClass
 import cn.zenliu.ktor.boot.reflect.isClass
@@ -14,8 +15,12 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.callSuspend
 
+/**
+ * BeanManager is application level manager for all bean instance
+ */
+@Ignore
 object BeanManager : CoroutineScope {
-    override val coroutineContext: CoroutineContext = DiRootCoroutineContext
+    override val coroutineContext: CoroutineContext = BootCoroutineContext
     private val beanRegistry = mutableMapOf<String, Any>()
     /**
      * create instance from container

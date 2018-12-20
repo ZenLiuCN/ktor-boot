@@ -2,7 +2,7 @@ package cn.zenliu.ktor.boot.annotations.context
 
 
 /**
- * define order
+ *  marker of class loading or configuration used order
  * @property value Int
  * @constructor
  */

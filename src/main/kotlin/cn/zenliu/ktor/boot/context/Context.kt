@@ -1,9 +1,6 @@
 package cn.zenliu.ktor.boot.context
 
-import cn.zenliu.ktor.boot.annotations.context.*
-import cn.zenliu.ktor.boot.annotations.routing.*
-
-import cn.zenliu.ktor.boot.reflect.*
+import cn.zenliu.ktor.boot.annotations.context.Ignore
 import io.ktor.application.Application
 import io.ktor.application.ApplicationCall
 import io.ktor.application.log
@@ -12,18 +9,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
-import kotlin.reflect.full.declaredFunctions
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.isSubclassOf
 
 //<editor-fold desc="Context">
-internal val DiRootCoroutineContext = GlobalScope.coroutineContext
+internal val BootCoroutineContext = GlobalScope.coroutineContext
 typealias HandlerContext = PipelineContext<Unit, ApplicationCall>
 
+/**
+ * Application Context manage all application dependencies
+ */
+@Ignore
 object Context : CoroutineScope {
-    override val coroutineContext: CoroutineContext = DiRootCoroutineContext
+    override val coroutineContext: CoroutineContext = BootCoroutineContext
     /**
      * start application
      * @param clazz KClass<*>
@@ -42,7 +38,7 @@ object Context : CoroutineScope {
             it to BeanManager.instanceOf(it)
         }.forEach { (container, instance) ->
             if (container.isConfigurationClass) {
-                (instance as Configuration).applicationConfiguration(app)
+                (instance as ApplicationConfiguration).applicationConfiguration(app)
             } else {
                 container.configurationFunctions().forEach {
                     BeanManager.executeKFunction(instance, it, app)

@@ -14,7 +14,7 @@ import kotlin.reflect.KClass
 
 
 /**
- * Start embed server
+ * *inline* start function for application, should be used in main function
  * @param args Array<String>
  */
 @KtorExperimentalAPI
@@ -45,6 +45,11 @@ inline fun <reified T : Any> Start(args: Array<String>) {
     }.start(wait = true)
 }
 
+/**
+ *  none inline start function for application, should be used in main function
+ * @param clazz KClass<*>
+ * @param args Array<String>
+ */
 @KtorExperimentalAPI
 fun <T> BootStart(clazz: KClass<*>, args: Array<String>) {
     PropertiesManager.setConfiguration(args)

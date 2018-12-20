@@ -4,7 +4,7 @@ import io.ktor.http.HttpMethod
 
 
 /**
- * define router handelr
+ * mark of an routing handler function
  * @property path String
  * @property method HTTPMETHOD
  * @constructor

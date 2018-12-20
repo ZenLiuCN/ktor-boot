@@ -2,7 +2,7 @@ package cn.zenliu.ktor.boot.context
 
 import cn.zenliu.ktor.boot.annotations.context.Ignore
 import cn.zenliu.ktor.boot.annotations.context.Order
-import cn.zenliu.ktor.boot.annotations.context.ScanPackage
+import cn.zenliu.ktor.boot.annotations.context.ComponentPackage
 import cn.zenliu.ktor.boot.reflect.findAnnotationSafe
 import kotlinx.coroutines.CoroutineScope
 import java.io.File
@@ -13,10 +13,11 @@ import kotlin.reflect.KClass
 import kotlin.streams.toList
 
 /**
- * ClassManager
+ * object ClassManager manage all class in application (with out [cn.zenliu.ktor.boot.annotations.context.Ignore])
  */
+@Ignore
 object ClassManager : CoroutineScope {
-    override val coroutineContext: CoroutineContext = DiRootCoroutineContext
+    override val coroutineContext: CoroutineContext = BootCoroutineContext
     internal val clazzRegistry = mutableMapOf<String, BeanContainer>()
 
     internal fun beanClass(name: String) = clazzRegistry[name]
@@ -34,8 +35,8 @@ object ClassManager : CoroutineScope {
      */
     fun register(clazz: KClass<*>) {
         clazz.annotations
-            .filter { it is ScanPackage }
-            .map { (it as ScanPackage).packages.toList() }
+            .filter { it is ComponentPackage }
+            .map { (it as ComponentPackage).packages.toList() }
             .flatten().filter { it.contains(".") }.toMutableSet().let {
                 it.add(clazz.java.`package`.name)
                 scanPackages(it.toSet())

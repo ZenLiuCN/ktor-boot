@@ -1,5 +1,6 @@
 package cn.zenliu.ktor.boot.context
 
+import cn.zenliu.ktor.boot.annotations.context.Ignore
 import com.typesafe.config.ConfigFactory
 import io.ktor.application.Application
 import io.ktor.config.ApplicationConfig
@@ -10,6 +11,11 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.reflect.KClass
 
+/**
+ * manage all properties defined in configuration files
+ * @see [config](https://github.com/lightbend/config)
+ */
+@Ignore
 @KtorExperimentalAPI
 object PropertiesManager {
 
@@ -22,7 +28,7 @@ object PropertiesManager {
     private val hostSslKeyAlias = "ktor.security.ssl.keyAlias"
     private val hostSslKeyStorePassword = "ktor.security.ssl.keyStorePassword"
     private val hostSslPrivateKeyPassword = "ktor.security.ssl.privateKeyPassword"
-    
+
     private var env:ApplicationEngineEnvironment?=null
     private val properties = mutableMapOf<String, KClass<*>>()
     private var conf: ApplicationConfig? = null

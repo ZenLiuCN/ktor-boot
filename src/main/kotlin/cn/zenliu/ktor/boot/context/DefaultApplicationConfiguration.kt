@@ -1,7 +1,7 @@
 package cn.zenliu.ktor.boot.context
 
 
-import cn.zenliu.ktor.boot.annotations.context.Configuration
+import cn.zenliu.ktor.boot.annotations.context.ApplicationConfiguration
 import cn.zenliu.ktor.boot.jackson.JsonMapper
 import cn.zenliu.ktor.boot.reflect.classExists
 import io.ktor.application.Application
@@ -10,9 +10,11 @@ import io.ktor.application.log
 import io.ktor.features.ContentNegotiation
 import io.ktor.jackson.jackson
 
-//<editor-fold desc="Default">
-@Configuration
-class DefaultConfiguration : cn.zenliu.ktor.boot.context.Configuration {
+/**
+ * Default Application Configuration
+ */
+@ApplicationConfiguration
+class DefaultApplicationConfiguration : cn.zenliu.ktor.boot.context.ApplicationConfiguration {
     override fun applicationConfiguration(app: Application) {
         app.log.info("default configuration running")
         app.apply {
@@ -30,4 +32,4 @@ class DefaultConfiguration : cn.zenliu.ktor.boot.context.Configuration {
     }
 
 }
-//</editor-fold>
+
