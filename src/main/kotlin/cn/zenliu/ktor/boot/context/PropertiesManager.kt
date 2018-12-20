@@ -37,7 +37,7 @@ object PropertiesManager {
         get() = if (env == null) {
             throw Throwable("application not init")
         } else {
-            env.application!!
+            env!!.application
         }
 
     fun setConfiguration(args: Array<String>) = commandLineEnvironment(args).apply {
