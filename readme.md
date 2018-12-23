@@ -5,6 +5,7 @@ an bootstarp toolset for ktor
 1. with spring like annotations
 2. self contained light weight DI
 3. easy to use
+# example to see [ktor-boot-example](http://github.com/ZenLiuCN/ktor-boot-example)
 # depends on
  1. kotlin
  2. ktor
