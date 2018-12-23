@@ -1,15 +1,22 @@
+/*
+ * Copyright (c) 2018. 
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS. 
+ */
+
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.3.11'
-    id 'com.github.johnrengelman.shadow' version '2.0.4'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.11' 
+
 }
 
 group 'cn.zenliu'
 version '1.0-SNAPSHOT'
 
-repositories {
-    mavenCentral()
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
 }
-
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
 dependencies {
 
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
@@ -22,6 +29,8 @@ dependencies {
     compileOnly "io.ktor:ktor-jackson:$ktor_version"
     compileOnly "joda-time:joda-time:2.10.1"
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinx_coroutines_version"
+    
+
 
     testImplementation "io.ktor:ktor-server-tests:$ktor_version"
 
@@ -35,11 +44,4 @@ dependencies {
     testImplementation "io.ktor:ktor-jackson:$ktor_version"
     testImplementation "joda-time:joda-time:2.10.1"
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinx_coroutines_version"
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
 }

@@ -8,9 +8,9 @@ package cn.zenliu.ktor.boot.annotations.request
 import cn.zenliu.ktor.boot.annotations.context.Ignore
 
 /**
- * mark one route function parameter should be as request url path variable
+ *  mark one route function parameter should be as request Query Parameter
  * @property name String
  * @constructor
  */
 @Target(AnnotationTarget.VALUE_PARAMETER)
-annotation class PathVariable(val name: String = "")
+annotation class QueryParameter(val name: String = "")

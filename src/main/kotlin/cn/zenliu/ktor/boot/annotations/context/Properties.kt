@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+@file:Ignore
 package cn.zenliu.ktor.boot.annotations.context
 
 /**
@@ -5,5 +10,7 @@ package cn.zenliu.ktor.boot.annotations.context
  * @property path String
  * @constructor
  */
+@MustBeDocumented
+@Ignore
 @Target(AnnotationTarget.CLASS)
-annotation class Properties(val path: String)
+annotation class Properties(val path: String="")

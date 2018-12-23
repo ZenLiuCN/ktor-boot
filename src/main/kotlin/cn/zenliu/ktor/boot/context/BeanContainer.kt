@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+
 package cn.zenliu.ktor.boot.context
 
 import cn.zenliu.ktor.boot.annotations.context.Controller
@@ -45,7 +50,7 @@ internal data class BeanContainer(
     }
     val hasConfigurationFunction: Boolean by lazy {
         clazz.declaredFunctionsSafe.any {
-            (it.annotations.find { it is ApplicationConfiguration } != null) && it.parameters.find {
+            it.findAnnotation<cn.zenliu.ktor.boot.annotations.context.ApplicationConfiguration>()!=null && it.parameters.find {
                 it.type.isClass(
                     Application::class
                 )

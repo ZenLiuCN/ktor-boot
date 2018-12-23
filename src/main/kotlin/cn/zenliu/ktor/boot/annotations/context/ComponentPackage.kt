@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+@file:Ignore
 package cn.zenliu.ktor.boot.annotations.context
 
 
@@ -6,5 +11,6 @@ package cn.zenliu.ktor.boot.annotations.context
  * @property packages Array<String>
  * @constructor
  */
+@Ignore
 @Target(AnnotationTarget.CLASS)
 annotation class ComponentPackage(val packages: Array<String>,val exclude:Array<String> = emptyArray())

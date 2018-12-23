@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+
 package cn.zenliu.ktor.boot.jackson
 
 import cn.zenliu.ktor.boot.reflect.tryKClass
@@ -68,7 +73,7 @@ object JsonMapper {
     @JvmStatic
     fun SimpleModule.registJodaDateTime() {
         "org.joda.time.DateTime".tryKClass?.let {
-            registerDeserializer { p, dctx ->
+            registerDeserializer { p, _ ->
                 when {
                     p.text.isNullOrEmpty() -> null
                     p.text == "null" -> null

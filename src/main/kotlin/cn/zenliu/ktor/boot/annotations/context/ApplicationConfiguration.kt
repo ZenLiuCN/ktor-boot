@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+@file:Ignore
 package cn.zenliu.ktor.boot.annotations.context
 
 import io.ktor.application.Application
@@ -7,6 +12,7 @@ import io.ktor.application.Application
  * @property order Int
  * @constructor
  */
+@Ignore
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 annotation class ApplicationConfiguration(val order: Int = 0)
 

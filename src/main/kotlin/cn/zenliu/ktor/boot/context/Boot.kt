@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018.
- * Program and supplies by Zen.Liu<lcz20@163.com>
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
  */
 
 package cn.zenliu.ktor.boot.context

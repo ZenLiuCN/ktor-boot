@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2018.
+ * written by Zen.Liu(http://github.com/ZenLiuCN/), supported by AS IS.
+ */
+
 package cn.zenliu.ktor.boot.context
 
 import cn.zenliu.ktor.boot.annotations.context.Ignore
@@ -5,6 +10,7 @@ import cn.zenliu.ktor.boot.annotations.context.Order
 import cn.zenliu.ktor.boot.annotations.context.ComponentPackage
 import cn.zenliu.ktor.boot.reflect.findAnnotationSafe
 import kotlinx.coroutines.CoroutineScope
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.JarURLConnection
 import java.net.URL
@@ -65,7 +71,7 @@ object ClassManager : CoroutineScope {
                             else -> setOf()
                         }
                     }
-            }.flatten().filter { it != null }.map { it!!.pkg + "." + it.name to it }.toMap()
+            }.flatten().filter { it != null && it.clazz.qualifiedName==it.pkg+"."+it.name }.map { it!!.pkg + "." + it.name to it }.toMap()
                 .toMutableMap()
         )
 
@@ -83,8 +89,11 @@ object ClassManager : CoroutineScope {
     fun getControllers() =
         clazzRegistry
             .filter { it.value.isController }
-            .map { it.value.clazz to BeanManager.instanceOf(it.value) }.sortedBy {
+            .map { it.value.clazz to BeanManager.instanceOf(it.value) }
+            .sortedBy {
                 it.first.findAnnotationSafe<Order>()?.value ?: 0
+            }.apply {
+                log.trace("registered controller $this")
             }
 
     fun getRouteFunctions() = clazzRegistry.filter { it.value.routeFunctions.isNotEmpty() }.map {
@@ -149,9 +158,10 @@ object ClassManager : CoroutineScope {
                     null
                 }
             }
-            ?.filter { it != null }
+            ?.filter { it != null && it.clazz.findAnnotationSafe<Ignore>()==null}
             ?.toList()
-            ?.filter { it!!.clazz.findAnnotationSafe<Ignore>()==null }
             ?.toSet()
             ?: setOf()
+    @JvmStatic
+    private val log=LoggerFactory.getLogger(ClassManager::class.java)
 }
