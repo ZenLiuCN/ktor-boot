@@ -14,19 +14,20 @@ import io.ktor.application.install
 import io.ktor.application.log
 import io.ktor.features.ContentNegotiation
 import io.ktor.jackson.jackson
+import org.slf4j.LoggerFactory
 
 /**
  * Default Application Configuration
  */
 @ApplicationConfiguration
-class DefaultApplicationConfiguration : cn.zenliu.ktor.boot.context.ApplicationConfiguration {
+open class DefaultApplicationConfiguration : cn.zenliu.ktor.boot.context.ApplicationConfiguration {
     override fun applicationConfiguration(app: Application) {
-        app.log.info("default configuration running")
+        log.info("default configuration running")
         app.apply {
             if ("io.ktor.features.ContentNegotiation".classExists &&
                 "com.fasterxml.jackson.databind.ObjectMapper".classExists
             ) {
-                app.log.info("default install contentNegotiation of fastxml jackson")
+                log.info("default install contentNegotiation of fastxml jackson")
                 install(ContentNegotiation) {
                     jackson {
                         JsonMapper.mapper = this
@@ -35,6 +36,16 @@ class DefaultApplicationConfiguration : cn.zenliu.ktor.boot.context.ApplicationC
             }
         }
     }
-
+    companion object {
+        private val log=LoggerFactory.getLogger(DefaultApplicationConfiguration::class.java)
+        internal fun getContainer()=DefaultApplicationConfiguration::class.let { cls->
+            BeanContainer(
+                cls.qualifiedName?.removeSuffix(".DefaultApplicationConfiguration")?:"",
+                "DefaultApplicationConfiguration",
+                "",
+                cls
+            )
+        }
+    }
 }
 

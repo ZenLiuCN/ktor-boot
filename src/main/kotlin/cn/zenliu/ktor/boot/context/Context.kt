@@ -47,6 +47,8 @@ object Context : CoroutineScope {
     private fun configuration(app: Application) =
         ClassManager.getConfigurations().filter { !it.clazz.isAbstract }.map {
             it to BeanManager.instanceOf(it)
+        }.toMutableList().apply {
+            this.add(DefaultApplicationConfiguration.getContainer() to BeanManager.instanceOf("",DefaultApplicationConfiguration::class))
         }.forEach { (container, instance) ->
             if (container.isConfigurationClass) {
                 (instance as ApplicationConfiguration).applicationConfiguration(app)
