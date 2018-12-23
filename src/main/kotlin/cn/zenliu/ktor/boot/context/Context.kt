@@ -10,6 +10,7 @@ import cn.zenliu.ktor.boot.jackson.toJsonNode
 import io.ktor.application.Application
 import io.ktor.application.ApplicationCall
 import io.ktor.application.log
+import io.ktor.util.KtorExperimentalAPI
 import io.ktor.util.pipeline.PipelineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
@@ -33,6 +34,7 @@ object Context : CoroutineScope {
      * @param clazz KClass<*>
      * @param application Application
      */
+    @KtorExperimentalAPI
     fun start(clazz: KClass<*>, application: Application) {
         ClassManager.register(clazz)
         log.trace("find bean classes: ${ClassManager.clazzRegistry}")
@@ -41,6 +43,7 @@ object Context : CoroutineScope {
         RouteManager.instance(application, ClassManager.getControllers(),ClassManager.getRouteFunctions())
     }
 
+    @KtorExperimentalAPI
     private fun configuration(app: Application) =
         ClassManager.getConfigurations().filter { !it.clazz.isAbstract }.map {
             it to BeanManager.instanceOf(it)

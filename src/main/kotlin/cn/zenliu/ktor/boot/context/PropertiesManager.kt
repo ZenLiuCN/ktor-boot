@@ -70,17 +70,17 @@ object PropertiesManager {
                 kClass.objectInstance?:kClass.constructors.first().let{
                     con->
                     con.callBy(con.parameters.map {
-                         this.configurate(
+                        it to this.configurate(
                             anno.path.let { if(it.isBlank())kClass.qualifiedName!! else it }
                         ).propertyOrNull( it.name?:"NULL").let{ conf->
                              when{
-                                 it.isOptional && conf==null->null to ""
-                                  conf==null->it to null
-                                 else->it to conf.getOfType(it.type)
+                                 it.isOptional && conf==null-> ""
+                                  conf==null-> null
+                                 else-> conf.getOfType(it.type)
                              }
                          }
 
-                    }.filter { it.first!=null }.toMap() as? Map<KParameter, Any?> ?: mapOf<KParameter,Any>()
+                    }.filter { !(it.first.isOptional&& it.second==null) }.toMap()
                     )
                 }
             }

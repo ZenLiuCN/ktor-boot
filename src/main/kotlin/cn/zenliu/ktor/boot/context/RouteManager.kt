@@ -53,6 +53,7 @@ import kotlin.reflect.jvm.javaType
  * @property log Logger
  * @constructor
  */
+@KtorExperimentalAPI
 @Ignore
 class RouteManager(
     private val application: Application,
@@ -431,6 +432,7 @@ class RouteManager(
             else -> value.toClass(Class.forName(type.javaType.typeName))
         }
 
+        @KtorExperimentalAPI
         private suspend fun processCallException(e: Throwable, call: ApplicationCall, log: org.slf4j.Logger) {
             log.trace("${e is ServiceException}")
             when (e) {

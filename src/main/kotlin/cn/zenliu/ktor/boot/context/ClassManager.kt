@@ -9,6 +9,7 @@ import cn.zenliu.ktor.boot.annotations.context.Ignore
 import cn.zenliu.ktor.boot.annotations.context.Order
 import cn.zenliu.ktor.boot.annotations.context.ComponentPackage
 import cn.zenliu.ktor.boot.reflect.findAnnotationSafe
+import io.ktor.util.KtorExperimentalAPI
 import kotlinx.coroutines.CoroutineScope
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -86,6 +87,7 @@ object ClassManager : CoroutineScope {
             it.clazz.findAnnotationSafe<Order>()?.value ?: 0
         }
 
+    @KtorExperimentalAPI
     fun getControllers() =
         clazzRegistry
             .filter { it.value.isController }
@@ -96,6 +98,7 @@ object ClassManager : CoroutineScope {
                 log.trace("registered controller $this")
             }
 
+    @KtorExperimentalAPI
     fun getRouteFunctions() = clazzRegistry.filter { it.value.routeFunctions.isNotEmpty() }.map {
         it.value.routeFunctions to BeanManager.instanceOf(
             it.value

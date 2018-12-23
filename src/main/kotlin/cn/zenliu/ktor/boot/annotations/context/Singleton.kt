@@ -11,7 +11,6 @@ package cn.zenliu.ktor.boot.annotations.context
  * @constructor
  */
 @Ignore
-@Experimental(Experimental.Level.WARNING)
 @Target(AnnotationTarget.CLASS)
 annotation class Singleton(val name: String = "")
 

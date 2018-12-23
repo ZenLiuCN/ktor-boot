@@ -22,6 +22,7 @@ import io.ktor.util.*
 import org.slf4j.LoggerFactory
 
 
+@KtorExperimentalAPI
 fun main(args: Array<String>) {
     Start<App>(args)
 }

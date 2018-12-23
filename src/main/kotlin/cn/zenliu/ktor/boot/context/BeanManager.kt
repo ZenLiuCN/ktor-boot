@@ -74,6 +74,7 @@ object BeanManager : CoroutineScope {
                     ).apply { beanRegistry[bname] = this }
     }
 
+    @KtorExperimentalAPI
     fun executeKFunction(target: Any, fn: KFunction<*>, vararg params: Any) = fn.parameters.map { param ->
         when {
             param.kind == KParameter.Kind.INSTANCE || param.kind == KParameter.Kind.EXTENSION_RECEIVER -> target
@@ -89,6 +90,7 @@ object BeanManager : CoroutineScope {
         fn.call(*it.toTypedArray())
     }
 
+    @KtorExperimentalAPI
     suspend fun asyncExcuteKFunction(target: Any, fn: KFunction<*>, vararg params: Any) =
         fn.parameters.map { param ->
             when {
