@@ -86,6 +86,7 @@ object PropertiesManager {
             }
                 else->null
     }
+    inline fun <reified T> getProperties()= PropertiesManager.getProperties(T::class) as T?
 
     fun string(path:String,default:String?=null)=config.propertyOrNull(path)?.getString()?:default
     fun int(path:String,default:Int?=null)=config.propertyOrNull(path)?.getString()?.toIntOrNull()?:default
