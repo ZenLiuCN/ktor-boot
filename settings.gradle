@@ -4,5 +4,5 @@
  */
 
 rootProject.name = 'ktor-boot'
-include 'example'
+include 'ktor-boot-example'
 
