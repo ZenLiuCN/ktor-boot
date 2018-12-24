@@ -258,7 +258,7 @@ class RouteManager(
                         p to when {
                             p.kind == KParameter.Kind.INSTANCE || p.kind == KParameter.Kind.EXTENSION_RECEIVER -> target
                             p.type.javaType.typeName == ApplicationCall::class.java.name -> call
-                            p.type.javaType.typeName == PipelineContext::class.java.name -> ctx
+                            p.type.javaType.typeName == "io.ktor.util.pipeline.PipelineContext<kotlin.Unit, io.ktor.application.ApplicationCall>" -> ctx
                             p.type.javaType.typeName == HandlerContext::class.java.name -> ctx
                             p.type.javaType.typeName == Attributes::class.java.name -> call.attributes
                             else -> {
