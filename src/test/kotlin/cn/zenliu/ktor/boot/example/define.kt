@@ -5,13 +5,19 @@
 
 package cn.zenliu.ktor.boot.example
 
+import cn.zenliu.ktor.boot.reflect.*
 import org.junit.Test
 
-operator fun Boolean.rem(value: Pair<Any?, Any?>) = if (this) value.first else value.second
+
 
 class TestOp {
     @Test
     fun test() {
-        println( (1 == 2 )% ("1" to "2"))
+        println("${TestOp::T.parameters[1].type.isClass<AnyType>()} ${TestOp::T.parameters[1].type.arguments}")
+        println("${TestOp::T.parameters[1].type.isClassContainer1<Collection<*>,AnyType>()} ${TestOp::T.parameters[1].type.arguments}")
+
+    }
+    fun T(map:Collection<*>){
+
     }
 }

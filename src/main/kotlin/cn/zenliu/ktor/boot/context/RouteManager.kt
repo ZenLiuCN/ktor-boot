@@ -7,43 +7,33 @@ package cn.zenliu.ktor.boot.context
 
 import cn.zenliu.ktor.boot.annotations.context.*
 import cn.zenliu.ktor.boot.annotations.request.*
-import cn.zenliu.ktor.boot.annotations.routing.Interceptor
-import cn.zenliu.ktor.boot.annotations.routing.RawRoute
-import cn.zenliu.ktor.boot.annotations.routing.RequestMapping
+import cn.zenliu.ktor.boot.annotations.routing.*
 import cn.zenliu.ktor.boot.context.BeanManager.executeKFunction
 import cn.zenliu.ktor.boot.context.RouteManager.Companion.log
-import cn.zenliu.ktor.boot.exceptions.NotValidRawRouteFunction
-import cn.zenliu.ktor.boot.exceptions.ServiceException
-import cn.zenliu.ktor.boot.http.ServerSentEvent
-import cn.zenliu.ktor.boot.http.StatusResponse
+import cn.zenliu.ktor.boot.exceptions.*
+import cn.zenliu.ktor.boot.http.*
 import cn.zenliu.ktor.boot.jackson.toClass
 import cn.zenliu.ktor.boot.reflect.*
 import io.ktor.application.*
 import io.ktor.features.origin
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.static
+import io.ktor.http.*
+import io.ktor.http.content.MultiPartData
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.PipelineContext
 import jdk.nashorn.internal.runtime.regexp.joni.Config.log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.io.ByteReadChannel
 import org.slf4j.LoggerFactory
-import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
+import reactor.core.publisher.*
 import reactor.core.scheduler.Schedulers
+import java.io.InputStream
 import java.lang.reflect.InvocationTargetException
 import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
-import kotlin.reflect.KType
+import kotlin.reflect.*
 import kotlin.reflect.full.*
-import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.*
 
 /**
  * sigleton class for all route handler
@@ -82,7 +72,6 @@ class RouteManager(
 
         }
     }
-
     internal data class RouteInterceptor(val fn: KFunction<*>, var path: String, val order: Int, val instance: Any)
     internal data class RouteDefine(
         val instance: Any,
@@ -128,7 +117,6 @@ class RouteManager(
             }
         }
     }
-
     internal data class RoutePath(
         val path: String,
         val variable: MutableList<String> = mutableListOf(),
@@ -149,7 +137,6 @@ class RouteManager(
             }
         }
     }
-
     private fun buildRoute(routing: Routing) {
         val interceptors = clazz.fold(mutableMapOf<String, MutableList<RouteInterceptor>>()) { map, (klazz, instance) ->
             klazz.declaredFunctionsSafe.filter {
@@ -244,140 +231,213 @@ class RouteManager(
         }
     }
 
+    companion object {
+        private val outputInnerServiceException: Boolean by lazy {
+            PropertiesManager.bool(BOOT_INNER_EXCEPTION, true) ?: true
+        }
+        private suspend fun annotationParameterProcessor(
+            target: Any,
+            ctx: HandlerContext,
+            fn: KFunction<*>
+        ) {
+            val call = ctx.context
+            try {
+                when (fn.parameters.size) {
+                    1 -> fn.callSuspend(target)
+                    else -> fn.callSuspendBy(
+                        fn.parameters.map { p ->
+                            log.trace("parameter of ${fn.name} $p ${p.type.jvmErasure}")
+                            p to when {
+                                p.kind == KParameter.Kind.INSTANCE || p.kind == KParameter.Kind.EXTENSION_RECEIVER -> target
+                                p.type.javaType.typeName == ApplicationCall::class.java.name -> call
+//                            p.type.jvmErasure ==  -> ctx
+                                p.type.javaType.typeName == "io.ktor.util.pipeline.PipelineContext<kotlin.Unit, io.ktor.application.ApplicationCall>" -> ctx
+                                p.type.isClass<Attributes>() -> call.attributes
+                                p.type.isClass<RequestCookies>() -> call.request.cookies
+                                p.type.isClass<Headers>() -> call.request.headers
+                                p.type.isClass<ApplicationRequest>() -> call.request
+                                p.type.isClass<ResponseCookies>() -> call.response.cookies
+                                p.type.isClass<ApplicationResponse>() -> call.response
 
-    private suspend fun annotationParameterProcessor(
-        target: Any,
-        ctx: HandlerContext,
-        fn: KFunction<*>
-    ) {
-        val call = ctx.context
-        try {
-            when (fn.parameters.size) {
-                1 -> fn.callSuspend(target)
-                else -> fn.callSuspendBy(
-                    fn.parameters.map { p ->
-                        p to when {
-                            p.kind == KParameter.Kind.INSTANCE || p.kind == KParameter.Kind.EXTENSION_RECEIVER -> target
-                            p.type.javaType.typeName == ApplicationCall::class.java.name -> call
-                            p.type.javaType.typeName == "io.ktor.util.pipeline.PipelineContext<kotlin.Unit, io.ktor.application.ApplicationCall>" -> ctx
-                            p.type.javaType.typeName == Attributes::class.java.name -> call.attributes
-                            else -> {
-                                p.findAnnotation<RequestBody>()?.let {
+                                p.findAnnotation<Header>() != null -> p.findAnnotation<Header>()!!.let { anno ->
+                                    val name = if (anno.name.isBlank()) p.name!! else anno.name
                                     when {
-                                        p.type.isTypeString -> call.receiveText()
-                                        p.isOptional -> call.receiveOrNull(p.type.kClass!!)
-                                        else -> try {
-                                            call.receive(p.type.kClass!!)
-                                        } catch (e: Throwable) {
-                                            throw ServiceException(
+                                        p.type.isClass<String>() -> when {
+                                            p.isOptional || p.type.isMarkedNullable -> call.request.headers.get(name)
+                                            else -> call.request.headers.get(name) ?: throw InnerServiceException(
                                                 HttpStatusCode.BadRequest,
-                                                "request not satisfied with query parameter ${p.name}",
-                                                e
+                                                "request miss header ${name}"
                                             )
                                         }
+                                        p.type.isClassContainer1<List<*>, String>() -> when {
+                                            p.isOptional || p.type.isMarkedNullable -> call.request.headers.getAll(name)
+                                            else -> call.request.headers.getAll(name) ?: listOf()
+                                        }
+                                        else -> log.error("header parameter is not String or List<String> ${target::class.qualifiedName}::${p.name}")
                                     }
                                 }
-                                    ?: p.findAnnotation<QueryParameter>()?.let {
-                                        call.request.queryParameters[if (it.name.isNotBlank()) it.name else p.name!!]?.let {
-                                            try {
-                                                parseParameter(
-                                                    p.type,
-                                                    it
+                                p.findAnnotation<Cookies>() != null && p.type.isMarkedNullable == true -> p.findAnnotation<Cookies>()!!.let {
+                                    val name = if (it.name.isBlank()) p.name!! else it.name
+                                    when {
+                                        p.isOptional || p.type.isMarkedNullable -> call.request.cookies[name]
+                                        else -> call.request.cookies[name] ?: throw InnerServiceException(
+                                            HttpStatusCode.BadRequest,
+                                            "request miss cookie ${name}"
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    p.findAnnotation<RequestBody>()?.let {
+                                        when {
+                                            p.type.isTypeString -> call.receiveText()
+                                            p.type.isClass<InputStream>() -> call.receiveStream()
+                                            p.type.isClass<MultiPartData>() -> call.receiveMultipart()
+                                            p.type.isClass<ByteReadChannel>() -> call.receiveChannel()
+                                            p.type.isClass<Parameters>() -> call.receiveParameters()
+                                            p.isOptional -> try {
+                                                call.receiveOrNull(
+                                                    p.type.kClass!!
+                                                )
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                            p.type.isMarkedNullable -> try {
+                                                call.receiveOrNull(
+                                                    p.type.kClass!!
+                                                )
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                            else -> try {
+                                                call.receive(
+                                                    p.type.apply {
+                                                        log.trace("parse class of parameter ${p.type}")
+                                                    }.kClass!!
                                                 )
                                             } catch (e: Throwable) {
-                                                throw ServiceException(
+                                                log.trace("error parse body $p ", e)
+                                                throw InnerServiceException(
                                                     HttpStatusCode.BadRequest,
-                                                    "request not satisfied with query parameter ${p.name}",
+                                                    "request not satisfied with query parameter ${p.name} of ${p.type.toString()}",
                                                     e
                                                 )
                                             }
                                         }
-                                            ?: when {
-                                                p.type.isMarkedNullable -> null
-                                                p.isOptional -> null
-                                                else -> throw ServiceException(
-                                                    HttpStatusCode.BadRequest,
-                                                    "request not satisfied with query parameter ${p.name}"
-                                                )
-                                            }
                                     }
-                                    ?: p.findAnnotation<PathVariable>()?.let {
-                                        call.parameters[if (it.name.isNotBlank()) it.name else p.name!!]?.let {
-                                            try {
-                                                parseParameter(
-                                                    p.type,
-                                                    it
-                                                )
-                                            } catch (e: Throwable) {
-                                                throw ServiceException(
-                                                    HttpStatusCode.BadRequest,
-                                                    "request not satisfied with query parameter ${p.name}",
-                                                    e
-                                                )
+                                        ?: p.findAnnotation<QueryParameter>()?.let {
+                                            call.request.queryParameters[if (it.name.isNotBlank()) it.name else p.name!!]?.let {
+                                                try {
+                                                    parseParameter(
+                                                        p.type,
+                                                        it
+                                                    )
+                                                } catch (e: Throwable) {
+                                                    throw InnerServiceException(
+                                                        HttpStatusCode.BadRequest,
+                                                        "request not satisfied with query parameter ${p.name}",
+                                                        e
+                                                    )
+                                                }
+                                            }
+                                                ?: when {
+                                                    p.type.isMarkedNullable -> null
+                                                    p.isOptional -> null
+                                                    else -> throw InnerServiceException(
+                                                        HttpStatusCode.BadRequest,
+                                                        "request not satisfied with query parameter ${p.name}"
+                                                    )
+                                                }
+                                        }
+                                        ?: p.findAnnotation<PathVariable>()?.let {
+                                            call.parameters[if (it.name.isNotBlank()) it.name else p.name!!]?.let {
+                                                try {
+                                                    parseParameter(
+                                                        p.type,
+                                                        it
+                                                    )
+                                                } catch (e: Throwable) {
+                                                    throw InnerServiceException(
+                                                        HttpStatusCode.BadRequest,
+                                                        "request not satisfied with query parameter ${p.name}",
+                                                        e
+                                                    )
+                                                }
+                                            }
+                                                ?: when {
+                                                    p.type.isMarkedNullable -> null
+                                                    p.isOptional -> null
+                                                    else -> throw InnerServiceException(
+                                                        HttpStatusCode.BadRequest,
+                                                        "request not satisfied with path parameter ${p.name}"
+                                                    )
+                                                }
+                                        }
+                                        ?: when {
+                                            p.type.isMarkedNullable -> null
+                                            p.isOptional -> null
+                                            else -> p.findAnnotation<AutoWire>().let {
+                                                try {
+                                                    BeanManager
+                                                        .instanceOf(it?.name ?: p.name ?: "", p.type.kClass!!)
+                                                } catch (e: Throwable) {
+                                                    throw InnerServiceException(
+                                                        HttpStatusCode.InternalServerError,
+                                                        "request process failed"
+                                                    )
+                                                }
                                             }
                                         }
-                                            ?: when {
-                                                p.type.isMarkedNullable -> null
-                                                p.isOptional -> null
-                                                else -> throw ServiceException(
-                                                    HttpStatusCode.BadRequest,
-                                                    "request not satisfied with path parameter ${p.name}"
-                                                )
-                                            }
-                                    }
-                                    ?: when {
-                                        p.type.isMarkedNullable -> null
-                                        p.isOptional -> null
-                                        else -> p.findAnnotation<AutoWire>().let {
-                                            try {
-                                                BeanManager
-                                                    .instanceOf(it?.name ?: p.name ?: "", p.type.kClass!!)
-                                            } catch (e: Throwable) {
-                                                throw ServiceException(
-                                                    HttpStatusCode.InternalServerError,
-                                                    "request process failed"
-                                                )
-                                            }
-                                        }
-                                    }
+                                }
                             }
-                        }
-                    }.filter { !(it.first.isOptional && it.second == null) }.toMap()
-                )
-            }.apply {
-                if ("reactor.core.publisher.Mono".classExists) {
-                    when (this) {
-                        is Unit -> Unit
-                        null -> Unit
-                        is Mono<*> -> doOnError {
-                            this.cancelOn(Schedulers.immediate())
-                            throw it
-                        }.subscribe {
-                            ctx.launch {
-                                parseResponse(it, ctx)
+                        }.filter { !(it.first.isOptional && it.second == null) }.toMap()
+                    )
+                }.apply {
+                    if ("reactor.core.publisher.Mono".classExists) {
+                        when (this) {
+                            is Unit -> Unit
+                            null -> Unit
+                            is Mono<*> -> doOnError {
+                                this.cancelOn(Schedulers.immediate())
+                                throw it
+                            }.subscribe {
+                                ctx.launch {
+                                    parseResponse(it, ctx)
+                                }
                             }
+                            is Flux<*> -> parseResponseReactor(this, ctx)
+                            else -> parseResponse(this, ctx)
                         }
-                        is Flux<*> -> parseResponseReactor(this, ctx)
-                        else -> parseResponse(this, ctx)
+                    } else {
+                        when (this) {
+                            is Unit -> Unit
+                            null -> Unit
+                            else -> parseResponse(this, ctx)
+                        }
                     }
+                }
+            } catch (e: Throwable) {
+                log.debug("error when process ${fn.name}")
+                if (this.exceptionHandlers.isEmpty()) {
+                    processCallException(e, call)
                 } else {
-                    when (this) {
-                        is Unit -> Unit
-                        null -> Unit
-                        else -> parseResponse(this, ctx)
+                    run Break@{
+                        exceptionHandlers.forEach {(handler,instance) ->
+                            if ((handler.callSuspend(instance,e) as Boolean)){
+                                return@Break
+                            }
+                        }
                     }
                 }
             }
-        } catch (e: Throwable) {
-            log.debug("error when process ${fn.name}")
-            processCallException(e, call, log)
+
         }
-
-    }
-
-    companion object {
-
-
+        private val exceptionHandlers by lazy {
+            ClassManager.getExceptionHanders().map { (funcs, instance) ->
+                funcs.map {
+                    it to instance
+                }
+            }.flatten().sortedBy { it.first.findAnnotation<ExceptionHandler>()!!.order }
+        }
         @JvmStatic
         val String.cleanUrl: String
             get() = kotlin.run {
@@ -433,15 +493,19 @@ class RouteManager(
         }
 
         @KtorExperimentalAPI
-        private suspend fun processCallException(e: Throwable, call: ApplicationCall, log: org.slf4j.Logger) {
-            log.trace("${e is ServiceException}")
-            when (e) {
-                is InvocationTargetException -> processCallException(
+        private suspend fun processCallException(e: Throwable, call: ApplicationCall) {
+            log.trace("${e is InnerServiceException}")
+            when {
+                e is InvocationTargetException -> processCallException(
                     e.targetException,
-                    call,
-                    log
+                    call
                 )
-                is ServiceException -> {
+                e is ServiceException -> {
+                    call.respondText(ContentType.Application.Json, e.status) {
+                        e.toJsonString(call.request.path(), parseRequest(call.request))
+                    }
+                }
+                e is InnerServiceException && outputInnerServiceException -> {
                     call.respondText(ContentType.Application.Json, e.status) {
                         e.toJsonString(call.request.path(), parseRequest(call.request))
                     }

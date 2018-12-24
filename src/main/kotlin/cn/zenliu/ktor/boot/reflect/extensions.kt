@@ -8,23 +8,20 @@
 package cn.zenliu.ktor.boot.reflect
 
 
-import cn.zenliu.ktor.boot.annotations.context.Controller
-import cn.zenliu.ktor.boot.annotations.context.Ignore
-import cn.zenliu.ktor.boot.annotations.context.Properties
-import cn.zenliu.ktor.boot.annotations.routing.Interceptor
-import cn.zenliu.ktor.boot.annotations.routing.RawRoute
-import cn.zenliu.ktor.boot.annotations.routing.RequestMapping
-import cn.zenliu.ktor.boot.context.InterceptorContext
+import cn.zenliu.ktor.boot.annotations.context.*
+import cn.zenliu.ktor.boot.annotations.routing.*
+import cn.zenliu.ktor.boot.context.*
 import io.ktor.routing.Routing
-import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
-import kotlin.reflect.KType
-import kotlin.reflect.full.declaredFunctions
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.functions
-import kotlin.reflect.jvm.javaType
-import kotlin.reflect.jvm.kotlinFunction
+import org.slf4j.LoggerFactory
+import kotlin.reflect.*
+import kotlin.reflect.full.*
+import kotlin.reflect.jvm.*
+
+/**
+ * compare of AnyType in *
+ */
+final class AnyType
+
 
 
 //<editor-fold desc="KClassExt">
@@ -33,6 +30,7 @@ val String.tryKClass: KClass<*>?
     inline get() = try {
         Thread.currentThread().contextClassLoader.loadClass(this).kotlin
     } catch (e: ClassNotFoundException) {
+        LoggerFactory.getLogger("cn.zenliu.ktor.boot.reflect.tryKClass").error("load class of $this failed")
         null
     }
 
@@ -44,10 +42,29 @@ val String.classExists: Boolean
         false
     }
 
-fun KType.isClass(cls: KClass<*>): Boolean = this.classifier == cls
-inline fun <reified T> KType.isClass(): Boolean = this.classifier == T::class
+fun KType.isClass(cls: KClass<*>): Boolean =
+    if (cls == AnyType::class) this.classifier == null else this.classifier == cls
 
-val KType.isTypeString: Boolean inline get() = this.isClass(String::class)|| this.isClass(java.lang.String::class)
+inline fun <reified T> KType.isClass(): Boolean =
+    if (T::class == AnyType::class) this.classifier == null else this.classifier == T::class
+
+inline fun <reified T, reified R> KType.isClassContainer1(): Boolean = this.classifier == T::class &&
+        this.arguments.size == 1 &&
+        if (R::class == AnyType::class) this.arguments[0].type == null else this.arguments[0].type!!.classifier == R::class
+
+inline fun <reified T, reified R, reified S> KType.isClassContainer2(): Boolean = this.classifier == T::class &&
+        this.arguments.size == 2 &&
+        if (R::class == AnyType::class) this.arguments[0].type == null else this.arguments[0].type!!.classifier == R::class &&
+                if (S::class == AnyType::class) this.arguments[1].type == null else this.arguments[1].type!!.classifier == S::class
+
+inline fun <reified T, reified R, reified S, reified U> KType.isClassContainer3(): Boolean =
+    this.classifier == T::class &&
+            this.arguments.size == 2 &&
+            if (R::class == AnyType::class) this.arguments[0].type == null else this.arguments[0].type!!.classifier == R::class &&
+                    if (S::class == AnyType::class) this.arguments[1].type == null else this.arguments[2].type!!.classifier == S::class &&
+                            if (U::class == AnyType::class) this.arguments[2].type == null else this.arguments[2].type!!.classifier == U::class
+
+val KType.isTypeString: Boolean inline get() = this.isClass(String::class) || this.isClass(java.lang.String::class)
 val KType.isTypeInt: Boolean inline get() = this.isClass(Int::class) || this.isClass(java.lang.Integer::class)
 val KType.isTypeLong: Boolean inline get() = this.isClass(Long::class) || this.isClass(java.lang.Long::class)
 val KType.isTypeByte: Boolean inline get() = this.isClass(Byte::class) || this.isClass(java.lang.Byte::class)
@@ -57,6 +74,8 @@ val KType.isTypeBoolean: Boolean inline get() = this.isClass(Boolean::class) || 
 val KType.isTypeFloat: Boolean inline get() = this.isClass(Float::class) || this.isClass(java.lang.Float::class)
 val KType.isTypeDouble: Boolean inline get() = this.isClass(Double::class) || this.isClass(java.lang.Double::class)
 val KType.isTypeByteArray: Boolean inline get() = this.isClass(ByteArray::class)
+val KType.isTypeCollection: Boolean inline get() = this.isClass(Collection::class)
+val KType.isTypeMap: Boolean inline get() = this.isClass(Map::class)
 //val KType.isTypeUInt: Boolean get() = this.isClass(UInt::class)
 
 val KType.kClass: KClass<*>?
@@ -71,7 +90,11 @@ val KType.kClass: KClass<*>?
         isTypeFloat -> Float::class
         isTypeDouble -> Double::class
         isTypeByteArray -> ByteArray::class
-        else -> this.javaType.typeName.tryKClass
+        else -> try {
+            this.jvmErasure
+        } catch (e: Throwable) {
+            this.javaType.typeName.tryKClass
+        }
     }
 
 val KType.simpleDefaultValue: Any?
@@ -117,11 +140,25 @@ val KClass<*>.annotationsSafe
     } catch (e: UnsupportedOperationException) {
         this.java.annotations.filterNotNull()
     }
+
 val KClass<*>.isPropertiesClass: Boolean
     inline get() = this.findAnnotationSafe<Properties>() != null && this.isData
+val KClass<*>.isExceptionHandler: Boolean
+    inline get() =  this.functions.find { it.isExceptionHandlerFunction }!=null
+
+val KClass<*>.exceptionHandlerFunctions
+    inline get() =  this.functions.filter { it.isExceptionHandlerFunction }
 
 //</editor-fold>
-
+val <R> KFunction<R>.isExceptionHandlerFunction: Boolean
+    get() ={
+        this.findAnnotation<ExceptionHandler>() != null &&
+                this.parameters.size == 2 &&
+                this.returnType.isClass<Boolean>() &&
+                (this.parameters[0].kind == KParameter.Kind.INSTANCE || this.parameters[0].kind == KParameter.Kind.EXTENSION_RECEIVER) &&
+                this.parameters[1].kind == KParameter.Kind.VALUE &&
+                this.parameters[1].type.isClass<HandlerContext>()
+    }.invoke()
 val KFunction<*>.isInterceptor
     get() = {
         this.findAnnotation<Interceptor>() != null &&

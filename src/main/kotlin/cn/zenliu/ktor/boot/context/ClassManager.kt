@@ -5,10 +5,8 @@
 
 package cn.zenliu.ktor.boot.context
 
-import cn.zenliu.ktor.boot.annotations.context.Ignore
-import cn.zenliu.ktor.boot.annotations.context.Order
-import cn.zenliu.ktor.boot.annotations.context.ComponentPackage
-import cn.zenliu.ktor.boot.reflect.findAnnotationSafe
+import cn.zenliu.ktor.boot.annotations.context.*
+import cn.zenliu.ktor.boot.reflect.*
 import io.ktor.util.KtorExperimentalAPI
 import kotlinx.coroutines.CoroutineScope
 import org.slf4j.LoggerFactory
@@ -17,6 +15,7 @@ import java.net.JarURLConnection
 import java.net.URL
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
+import kotlin.reflect.full.findAnnotation
 import kotlin.streams.toList
 
 /**
@@ -86,7 +85,8 @@ object ClassManager : CoroutineScope {
         clazzRegistry.filter { it.value.isConfigurationClass || it.value.hasConfigurationFunction }.map { it.value }.sortedBy {
             it.clazz.findAnnotationSafe<Order>()?.value ?: 0
         }
-
+    @KtorExperimentalAPI
+    fun getExceptionHanders()= clazzRegistry.filter { it.value.clazz.isExceptionHandler }.map { it.value.clazz.exceptionHandlerFunctions.sortedBy { it.findAnnotation<ExceptionHandler>()!!.order } to BeanManager.instanceOf(it.value) }
     @KtorExperimentalAPI
     fun getControllers() =
         clazzRegistry
