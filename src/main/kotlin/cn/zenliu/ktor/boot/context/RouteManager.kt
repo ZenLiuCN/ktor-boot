@@ -23,6 +23,7 @@ import io.ktor.features.origin
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.static
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -259,7 +260,6 @@ class RouteManager(
                             p.kind == KParameter.Kind.INSTANCE || p.kind == KParameter.Kind.EXTENSION_RECEIVER -> target
                             p.type.javaType.typeName == ApplicationCall::class.java.name -> call
                             p.type.javaType.typeName == "io.ktor.util.pipeline.PipelineContext<kotlin.Unit, io.ktor.application.ApplicationCall>" -> ctx
-                            p.type.javaType.typeName == HandlerContext::class.java.name -> ctx
                             p.type.javaType.typeName == Attributes::class.java.name -> call.attributes
                             else -> {
                                 p.findAnnotation<RequestBody>()?.let {
